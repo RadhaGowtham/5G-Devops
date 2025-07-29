@@ -1,0 +1,164 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata: 
+  name: bankapp
+---
+
+# MySQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: bankapp  
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+       affinity:
+         NodeAffinity:
+           preferredDuringSchedulingIgnoredDuringExecution:
+             - weight: 1
+               preference:
+                 matchExpressions:
+                   - key: node
+                     operator: In
+                     values:
+                       - worker
+      #tolerations:
+      #- key: node
+        #operator: Equal
+        #value: hatepods
+        #effect: NoSchedule
+      #NodeSelector:
+        #app:bankapp    
+      containers:
+      - image: mysql:8
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: config
+              key: MYSQL_DATABASE 
+        ports:
+        - containerPort: 3306
+          name: mysql
+          
+---
+# MySQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: bankapp  
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+---
+# Java Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bankapp
+  namespace: bankapp  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bankapp
+  template:
+    metadata:
+      labels:
+        app: bankapp
+    spec:
+      spec:
+       affinity:
+         NodeAffinity:
+           preferredDuringSchedulingIgnoredDuringExecution:
+             - weight: 1
+               preference:
+                 matchExpressions:
+                   - key: node
+                     operator: In
+                     values:
+                       - worker
+      #NodeSelector:
+        #app:bankapp
+          
+      #tolerations:
+      #- key: node
+       # operator: Equal
+       # value: hatepods
+        #effect: NoSchedule
+      containers:
+      - name: bankapp
+        image: radhagowthamhub/bankapp:18
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: config
+              key: SPRING_DATASOURCE_URL
+  
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: config
+              key: SPRING_DATASOURCE_USERNAME  
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: secret
+              key: SPRING_DATASOURCE_PASSWORD  
+---
+# Bank Application Service (NodePort for external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: bankapp-service
+  namespace: bankapp  
+spec:
+  type: NodePort
+  selector:
+    app: bankapp
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080
+---      
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: config
+  namespace: bankapp
+data:
+  MYSQL_DATABASE: bankappdb
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+  SPRING_DATASOURCE_USERNAME: root
+---  
+apiVersion: v1
+kind: Secret
+metadata: 
+  name: secret
+  namespace: bankapp
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: Test@123
+  SPRING_DATASOURCE_PASSWORD: Test@123
