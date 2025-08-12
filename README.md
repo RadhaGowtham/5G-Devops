@@ -58,6 +58,13 @@ spec:
             cpu: "200m"
         ports:
         - containerPort: 80
+       readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+ 
 ---
 apiVersion: v1
 kind: Service
