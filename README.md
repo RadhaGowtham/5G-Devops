@@ -102,7 +102,13 @@ kubectl run -i --tty load-generator --image=busybox /bin/sh
 
 Inside the pod shell:
 
-while true; do wget -q -O- http://nginx-deployment; done
+while true; do wget -q -O- http://nginx-deployment; done  # for nginx application
+
+while true; do wget -q -O- https://fantastic-train-699pg6vjr9r5h477x-8989.app.github.dev/login; done # for my-app application
+
+
+
+https://fantastic-train-699pg6vjr9r5h477x-8989.app.github.dev/login
 
 This loop generates CPU load. Leave it running for a few minutes.
 
