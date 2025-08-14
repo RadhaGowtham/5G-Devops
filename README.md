@@ -20,7 +20,8 @@ Then patch the deployment to allow insecure TLS (needed for kind):
 
 kubectl patch deployment metrics-server -n kube-system \
   --type=json \
-  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
 
 Wait a few seconds and then confirm it's working:
 
