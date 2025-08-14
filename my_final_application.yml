@@ -1,6 +1,4 @@
-# -------------------------------
 # Java Application Deployment
-# -------------------------------
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,28 +14,49 @@ spec:
         app: bankapp
     spec:
       containers:
-      - name: bankapp
-        image: radhagowthamhub/bankapp:latest
-        ports:
-        - containerPort: 8080
-        resources:  
-          requests:
-            cpu: "200m"
-            memory: "128Mi"
-          limits:
-            cpu: "500m"
-            memory: "256Mi"  
-        env:
-        - name: SPRING_DATASOURCE_URL
-          value: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-        - name: SPRING_DATASOURCE_USERNAME
-          value: root
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: Test@123
+        - name: bankapp
+          image: radhagowthamhub/bankapp:latest
+          ports:
+            - containerPort: 8080
+          resources:  
+            requests:
+              cpu: "300m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 2
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: config
+                  key: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: config
+                  key: SPRING_DATASOURCE_USERNAME  
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: SPRING_DATASOURCE_PASSWORD
 ---
-# -------------------------------
 # Bank Application Service (NodePort)
-# -------------------------------
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,20 +66,18 @@ spec:
   selector:
     app: bankapp
   ports:
-  - port: 80
-    targetPort: 8080
-    nodePort: 30080
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080
 ---
-# -------------------------------
-# MySQL StatefulSet using manual PVC
-# -------------------------------
+# MySQL StatefulSet
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql
 spec:
-  serviceName: mysql-service
-  replicas: 1
+  serviceName: mysql-service # headless service name 
+  replicas: 1  # Set to 1 unless you configure MySQL clustering
   selector:
     matchLabels:
       app: mysql
@@ -74,48 +91,55 @@ spec:
         image: mysql:8
         env:
         - name: MYSQL_ROOT_PASSWORD
-          value: "Test@123"
+          valueFrom:
+            secretKeyRef:
+              name: secret
+              key: MYSQL_ROOT_PASSWORD
         - name: MYSQL_DATABASE
-          value: "bankappdb"
+          valueFrom:
+            configMapKeyRef:
+              name: config
+              key: MYSQL_DATABASE
         ports:
         - containerPort: 3306
         resources:  
           requests:
-            cpu: "200m"
-            memory: "128Mi"  
+            cpu: "400m"
+            memory: "256Mi"
           limits:
             cpu: "500m"
-            memory: "256Mi"    
+            memory: "512Mi" 
         volumeMounts:
-        - name: mysql-storage
+        - name: mysql-pvc
           mountPath: /var/lib/mysql
-      volumes:
-      - name: mysql-storage
-        persistentVolumeClaim:
-          claimName: mysql-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-pvc
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: standard
 ---
-# -------------------------------
 # MySQL Headless Service
-# -------------------------------
 apiVersion: v1
 kind: Service
 metadata:
   name: mysql-service
 spec:
-  clusterIP: None
+  clusterIP: None  # Fixed casing
   selector:
     app: mysql
   ports:
-  - port: 3306
-    targetPort: 3306
+    - port: 3306
+      targetPort: 3306
 ---
-# -------------------------------
-# Manually Created PVC for MySQL
-# -------------------------------
+#Creating PVC
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mysql-pvc
+  name: pvc
 spec: 
   storageClassName: standard
   accessModes:
@@ -123,3 +147,54 @@ spec:
   resources:
     requests:
       storage: 1Gi
+---
+#configmap
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: config
+data:
+  MYSQL_DATABASE: bankappdb
+  SPRING_DATASOURCE_URL: jdbc:mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+  SPRING_DATASOURCE_USERNAME: root
+---
+#secrets
+apiVersion: v1
+kind: Secret
+metadata: 
+  name: secret
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: Test@123
+  SPRING_DATASOURCE_PASSWORD: Test@123
+---
+#HPA
+# First install metrics server using below commands
+#kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+#kubectl patch deployment metrics-server -n kube-system \
+#  --type=json \
+#  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+#kubectl get deployment metrics-server -n kube-system
+#kubectl top nodes and kubectl top pods
+
+
+ # autoscaling/v1 = scale based on CPU metrics only and autoscaling/v1 = scale based on memory, custom, and external metrics.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpaautoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bankapp
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 10
+
