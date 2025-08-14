@@ -127,3 +127,34 @@ Use:
 
 kubectl top pods
 kubectl describe hpa
+-----------------------------------------------------------------------------------------------------------------
+If you're using autoscaling/v2 (which you are), there’s a default scale-down stabilization window of 300 seconds (5 minutes), meaning it won’t scale down immediately.
+
+You can override it explicitly:
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpaautoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bankapp
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
