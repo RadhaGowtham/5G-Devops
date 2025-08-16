@@ -1,0 +1,42 @@
+# Shared values for secrets and configmaps
+shared:
+  configmap: bankconfig
+  secret: banksecret
+
+# Frontend application
+frontend:
+  replicas: 2
+  appLabel: bankapp
+  image:
+    repository: radhagowthamhub/bankapp
+    tag: latest
+  service:
+    name: bankapp-service
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  env:
+    SPRING_DATASOURCE_URL: mysql://mysql-service:3306/bankappdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    SPRING_DATASOURCE_USERNAME: root
+    SPRING_DATASOURCE_PASSWORD: Test@123
+    
+
+# Backend (MySQL)
+backend:
+  name: mysql
+  serviceName: mysql-service
+  replicas: 1
+  appLabel: mysql
+  image:
+    repository: mysql
+    tag: "8"
+  servicePort: 3306
+  serviceTargetPort: 3306
+  pvcName: mysql-pvc
+  accessMode: ReadWriteOnce
+  storage: 1Gi
+  storageClassName: standard
+  env:
+    MYSQL_DATABASE: bankappdb
+    MYSQL_ROOT_PASSWORD: Test@123
+

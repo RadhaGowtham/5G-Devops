@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.serviceName | default "mysql-service" }}
+  labels:
+    app: {{ .Values.backend.appLabel | default "mysql" }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Values.backend.appLabel | default "mysql" }}
+  ports:
+    - port: {{ .Values.backend.servicePort | default 3306 }}
+      targetPort: {{ .Values.backend.serviceTargetPort | default 3306 }}
+

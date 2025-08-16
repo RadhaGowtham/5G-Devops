@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }} # Need to use "" only for string values not for integers
+  selector:
+    matchLabels:
+      app: bankapp
+  template:
+    metadata:    
+      labels:
+        app: bankapp
+    spec:
+      containers:
+      - name: frontend-bankapp
+        image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+        ports:
+          - containerPort: {{ .Values.frontend.service.targetPort }}
+        env:
+          - name: SPRING_DATASOURCE_URL
+            valueFrom:
+              configMapKeyRef:
+                name: {{ .Values.shared.configmap }}
+                key: SPRING_DATASOURCE_URL  
+          - name: SPRING_DATASOURCE_USERNAME    
+            valueFrom:
+              configMapKeyRef:
+                name: {{ .Values.shared.configmap }}
+                key: SPRING_DATASOURCE_USERNAME   
+          - name: SPRING_DATASOURCE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.shared.secret }}
+                key: SPRING_DATASOURCE_PASSWORD
+                
+                    
+              
