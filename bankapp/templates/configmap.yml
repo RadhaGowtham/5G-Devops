@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.shared.configmap }}
+data:
+  MYSQL_DATABASE:  "{{ .Values.backend.env.MYSQL_DATABASE }}"
+  SPRING_DATASOURCE_URL: "{{ .Values.frontend.env.SPRING_DATASOURCE_URL }}"
+  SPRING_DATASOURCE_USERNAME: "{{ .Values.frontend.env.SPRING_DATASOURCE_USERNAME }}"
+

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.backend.name | default "mysql" }}
+spec:
+  serviceName: {{ .Values.backend.serviceName | default "mysql-service" }}
+  replicas: {{ .Values.backend.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.backend.appLabel | default "mysql" }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.backend.appLabel | default "mysql" }}
+    spec:
+      containers:
+      - name: backend
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.shared.secret }}
+                key: MYSQL_ROOT_PASSWORD
+          - name: MYSQL_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: {{ .Values.shared.configmap }}
+                key: MYSQL_DATABASE
+        ports:
+          - containerPort: 3306
+        volumeMounts:
+          - name: mysql-pvc
+            mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-pvc
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ .Values.backend.storage | default "1Gi" }}
+      storageClassName: {{ .Values.backend.storageClassName | default "standard" }}
+
